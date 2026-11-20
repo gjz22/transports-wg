@@ -189,6 +189,58 @@ The specification defines `clientCapabilities` as "relevant to this
 request."  Server-side handling therefore needs an explicit
 cross-request mechanism that the other dimensions do not.
 
+#### What LSP Says About the Tradeoff
+
+LSP never discusses server-side vs. client-side handling of
+capabilities, because it never needed to.  Capabilities are exchanged
+once and hold for the whole session, so the server always knows what
+the client supports and simply tailors its behavior.  The
+cross-request problem cannot arise in LSP.  SEP-2575 created it for
+MCP by removing the session.  LSP does have three related pieces of
+prior art:
+
+- **Completion filtering is client-side by design, with stated
+  reasons.**  The
+  [Completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
+  section says:
+
+  > to achieve consistency across languages and to honor different
+  > clients usually the client is responsible for filtering and
+  > sorting.  This has also the advantage that client can experiment
+  > with different filter and sorting models.  However servers can
+  > enforce different behavior by setting a `filterText` / `sortText`
+  >
+  > for speed clients should be able to filter an already received
+  > completion list if the user continues typing.  Servers can opt out
+  > of this using a `CompletionList` and mark it as `isIncomplete`.
+
+  The reasoning mirrors the SEP's: client flexibility in how results
+  are presented, and reuse of an already-received list.  The server
+  keeps an override (`filterText`) and an opt-out (`isIncomplete`).
+  The caveat is that completion items are filtered by what the user
+  has typed, not by client capabilities.  This is precedent for
+  *where* to filter, not for capabilities specifically.
+- **Changes to available features are server-pushed and stateful.**
+  [`client/registerCapability`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability)
+  and `client/unregisterCapability` let servers add or remove features
+  after `initialize`.  The 3.0 changelog says servers "can more
+  dynamically react to client features" and "react to settings or
+  configuration changes without a restart."  A server supporting both
+  static and dynamic registration "needs to check the client
+  capability in the initialize request," which is server-side
+  tailoring that depends on the session.  The MCP counterpart is
+  `notifications/tools/list_changed`.
+- **Unknown metadata is ignored.**
+  [Capabilities](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#capabilities):
+  "Clients should ignore server capabilities they don't understand."
+  This is the same pattern as MCP Apps' `_meta.ui`, which clients
+  without MCP Apps support ignore.
+
+In short, LSP is prior art for server-side tailoring, but only
+because its capabilities are scoped to a session, which MCP's no
+longer are.  Where LSP does weigh client-side against server-side
+filtering (completion), it defaults to the client.
+
 ### Extensions
 
 Extensions are declared inside client capabilities
@@ -259,6 +311,10 @@ contributes to the cache key.
    and for shared caching.  RFC 8942 shows that server-side capability
    negotiation is workable, but only with opt-in disclosure and
    explicit `Vary`.
+5. **LSP's server-side tailoring relies on session-scoped
+   capabilities.**  MCP no longer has those.  Where LSP does choose
+   where to filter (completion), it defaults to the client, for reasons
+   similar to the SEP's.
 
 ## Candidate Principles (for Discussion)
 
