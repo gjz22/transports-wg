@@ -297,6 +297,22 @@ advantages.
   explicitly declaring the capabilities of each related method on
   every request (see Alternative 1a) -- which adds request complexity
   and coordination rules that per-tool annotations avoid entirely.
+- **Minimal capability disclosure.**  The client never has to reveal
+  what it can do in order to receive the right tool list: it matches
+  the annotations locally and declares a capability only on the
+  `tools/call` that actually needs it.  With server-side filtering,
+  the client must disclose its full capability set -- every capability
+  and extension it supports -- up front to every server it lists tools
+  from, or risk having tools filtered out.  That set can be
+  identifying (fingerprinting a particular client, version, or
+  deployment), and it can include capabilities the client would rather
+  not advertise broadly, such as experimental or organization-internal
+  extensions.  To avoid this, a client would need its own policy for
+  selectively disclosing capabilities to particular servers -- for
+  example, revealing an internal extension only to its organization's
+  own servers.  Under client-side filtering, the server publishes its
+  requirements to everyone, and that disclosure decision never arises
+  at list time.
 
 Client-side filtering does carry a structural downside: filtering now
 happens in two places.  Servers commonly already filter the tool list
@@ -597,6 +613,7 @@ that motivated this SEP.
 | **Tool list cacheable without capability cache key** | Yes: identical response for all clients | No: each declared related-capability set yields a different list | No: each capability set yields a different list | Yes: identical response for all clients |
 | **Client chooses how to respond** (hide, disable, allow-and-error) | Yes | No: filtered tools are invisible to the client | No: filtered tools are invisible to the client | No: only call-time failure |
 | **Transparency to the client** (client sees all tools the server provides) | Yes, with their requirements | No: filtered tools are invisible to the client | No: filtered tools are invisible to the client | Yes, but without requirement information |
+| **Minimal capability disclosure** (client reveals capabilities only where a call needs them) | Yes: capabilities are declared only on the `tools/call` that needs them; the client filters locally | No: the client must declare the capabilities of related methods up front to receive an accurate list | No: the client must declare its full capability set on every request | Yes: nothing extra is disclosed |
 | **Preserves per-request capability scoping** | Yes: annotations are independent of request capabilities | Yes: capabilities are explicitly keyed by method | No: capabilities are assumed global, not scoped to the declaring request | Yes |
 | **Simplicity for client implementers** | Medium: must implement matching for `requiredCapabilities` | Low without SDK support: must attach a map of related-request capabilities to each outgoing request | High: send the same capabilities on every request; no matching or per-method map to maintain | High: nothing to do |
 | **Simplicity for server implementers** | Medium: must declare capability requirements for every tool | Medium: must parse and apply related-request capabilities | High: use the capabilities on each request directly | High: validate at call time only |
@@ -1041,8 +1058,11 @@ capability is missing.
 
 Because every client receives the same annotated tool list, servers no
 longer produce per-client tool lists, and a `tools/list` response
-reveals nothing about any particular client's capabilities.  The
-annotations do reveal which capabilities each tool uses internally
+reveals nothing about any particular client's capabilities.
+Conversely, a client need not disclose its capabilities in order to
+receive an accurate tool list (see
+[Advantages of Client-Side Filtering](#advantages-of-client-side-filtering)).
+The annotations do reveal which capabilities each tool uses internally
 (e.g., that a tool performs elicitation); servers handling sensitive
 tools should consider whether that is information they are comfortable
 publishing to all clients.
